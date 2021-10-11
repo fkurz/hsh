@@ -1,11 +1,14 @@
 module Main where
 
-import Control.Monad (unless, when, return, join)
+import Control.Monad (unless, when, return, join, (>=>))
 import Control.Monad.IO.Class (liftIO)
 import Data.List (intercalate)
 import System.IO (BufferMode(..), isEOF, hSetBuffering, stdout, hFlush)
+import System.Directory (getCurrentDirectory)
 import Prelude (IO, Int, String, Either(..), Maybe(..), Show, not, show, getLine, map, putStr, putStrLn, show, unwords, ($), (.), (++), (>>), (>>=), (<$>))
 import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), loadModules, setImports, interpret, as, runInterpreter)
+import System.FilePath.Posix (joinPath)
+
 import Lib (CommandLineExecutionResult)
 
 {-
@@ -13,11 +16,12 @@ TODOs
 - parse and interpret code (/)
 - implement echo + cd + cwd + calc
   - echo (/)
-  - cd ()
+  - cd (/)
   - cwd (/)
   - calc (/)
   - print/printf ()
   - ls ()
+- bug: allow cd without breaking module imports (/)
 - implement pipe operator 
   - cwd & ls
   - calc $ 1 + 1 & echo
@@ -35,15 +39,28 @@ TODOs
   - using starship toml format?
 -}
 
-main = processCommands
+data Configuration = Configuration {
+  moduleListOf :: [String],
+  importListOf :: [String]
+}
 
-processCommands :: IO ()
-processCommands = do
+main = do 
+  configuration <- buildConfiguration
+  processCommands configuration
+
+buildConfiguration :: IO Configuration
+buildConfiguration = do 
+  currentWorkingDirectory <- getCurrentDirectory
+  let libDirectory = joinPath [currentWorkingDirectory, "src/Lib.hs"]
+  return $ Configuration { moduleListOf = [libDirectory], importListOf = ["Prelude", "Lib"] }
+
+processCommands :: Configuration -> IO ()
+processCommands configuration = do
   commandLine' <- prompt drawPrompt
   case commandLine' of 
     Just commandLine -> do 
-      processCommandLine commandLine errorHandler successHandler
-      processCommands
+      processCommandLine configuration commandLine errorHandler successHandler
+      processCommands configuration
     Nothing -> do 
       putStrLn "Exiting hsh"
 
@@ -61,14 +78,14 @@ drawPrompt = "\n> "
 
 type CommandLineInterpreterResult = Either InterpreterError (IO CommandLineExecutionResult)
 
-processCommandLine :: String -> (String -> IO ()) -> (String -> IO ()) -> IO ()
-processCommandLine commandLine errorHandler successHandler = do
-  commandLineInterpreterResult <- runCommandLineInterpreter commandLine
+processCommandLine :: Configuration -> String -> (String -> IO ()) -> (String -> IO ()) -> IO ()
+processCommandLine configuration commandLine errorHandler successHandler = do
+  commandLineInterpreterResult <- runCommandLineInterpreter configuration commandLine
   processCommandLineInterpreterResult commandLineInterpreterResult errorHandler successHandler
 
-runCommandLineInterpreter commandLine = runInterpreter $ do 
-    loadModules ["src/Lib.hs"]
-    setImports ["Prelude", "Lib"]
+runCommandLineInterpreter configuration commandLine = runInterpreter $ do 
+    loadModules $ moduleListOf configuration
+    setImports $ importListOf configuration
     interpret commandLine (as :: IO CommandLineExecutionResult)
 
 processCommandLineInterpreterResult :: CommandLineInterpreterResult  -> (String -> IO ()) -> (String -> IO ()) -> IO ()
