@@ -5,20 +5,20 @@ import System.Directory (getCurrentDirectory, setCurrentDirectory)
 import System.IO (FilePath)
 import Control.Monad.IO.Class (liftIO)
 
-type CommandLineInterpreterResult = Either String String
+type CommandLineExecutionResult = Either String String
 
-calc :: Int -> IO CommandLineInterpreterResult
+calc :: Int -> IO CommandLineExecutionResult
 calc integer = liftIO $ Right <$> liftIO (return $ show integer)
 
-cd :: FilePath -> IO CommandLineInterpreterResult
+cd :: FilePath -> IO CommandLineExecutionResult
 cd filePath = do 
     setCurrentDirectory filePath
     return $ Right ""
 
-cwd :: IO CommandLineInterpreterResult
+cwd :: IO CommandLineExecutionResult
 cwd = liftIO $ Right <$> getCurrentDirectory 
 
-echo :: String -> IO CommandLineInterpreterResult
+echo :: String -> IO CommandLineExecutionResult
 echo message = do 
     putStrLn message
     return $ Right ""

@@ -6,7 +6,7 @@ import Data.List (intercalate)
 import System.IO (BufferMode(..), isEOF, hSetBuffering, stdout, hFlush)
 import Prelude (IO, Int, String, Either(..), Maybe(..), Show, not, show, getLine, map, putStr, putStrLn, show, unwords, ($), (.), (++), (>>), (>>=), (<$>))
 import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), loadModules, setImports, interpret, as, runInterpreter)
-import Lib (CommandLineInterpreterResult)
+import Lib (CommandLineExecutionResult)
 
 {-
 TODOs
@@ -16,6 +16,8 @@ TODOs
   - cd ()
   - cwd (/)
   - calc (/)
+  - print/printf ()
+  - ls ()
 - implement pipe operator 
   - cwd & ls
   - calc $ 1 + 1 & echo
@@ -33,10 +35,6 @@ TODOs
   - using starship toml format?
 -}
 
--- TODO FK rm?
--- say :: String -> Interpreter ()
--- say = liftIO . putStrLn
-
 main = processCommands
 
 processCommands :: IO ()
@@ -44,15 +42,15 @@ processCommands = do
   commandLine' <- prompt drawPrompt
   case commandLine' of 
     Just commandLine -> do 
-      interpretCommandLine commandLine errorHandler successHandler
+      processCommandLine commandLine errorHandler successHandler
       processCommands
     Nothing -> do 
       putStrLn "Exiting hsh"
 
 -- See https://stackoverflow.com/a/13190872
 prompt :: String -> IO (Maybe String)
-prompt promptText = do
-    putStr promptText
+prompt drawPrompt = do
+    putStr drawPrompt
     hFlush stdout
     hasMoreInput <- not <$> isEOF
     if hasMoreInput 
@@ -61,20 +59,26 @@ prompt promptText = do
 
 drawPrompt = "\n> "
 
--- interpretCommandLine :: String -> Interpreter ()
-interpretCommandLine :: String -> (String -> IO()) -> (String -> IO()) -> IO ()
-interpretCommandLine commandLine errorHandler successHandler = do
-  interpretedCommandLine <- runInterpreter $ do 
+type CommandLineInterpreterResult = Either InterpreterError (IO CommandLineExecutionResult)
+
+processCommandLine :: String -> (String -> IO ()) -> (String -> IO ()) -> IO ()
+processCommandLine commandLine errorHandler successHandler = do
+  commandLineInterpreterResult <- runCommandLineInterpreter commandLine
+  processCommandLineInterpreterResult commandLineInterpreterResult errorHandler successHandler
+
+runCommandLineInterpreter commandLine = runInterpreter $ do 
     loadModules ["src/Lib.hs"]
     setImports ["Prelude", "Lib"]
-    interpret commandLine (as :: IO CommandLineInterpreterResult)
-  case interpretedCommandLine of 
-    Left interpreterError -> errorHandler $ showInterpreterError interpreterError
-    Right interpreterResult' -> do 
-      interpreterResult <- interpreterResult'
-      case interpreterResult of 
-        Left error -> errorHandler error
-        Right success -> successHandler success
+    interpret commandLine (as :: IO CommandLineExecutionResult)
+
+processCommandLineInterpreterResult :: CommandLineInterpreterResult  -> (String -> IO ()) -> (String -> IO ()) -> IO ()
+processCommandLineInterpreterResult commandLineInterpreterResult errorHandler successHandler = case commandLineInterpreterResult of 
+  Left interpreterError -> errorHandler $ showInterpreterError interpreterError
+  Right interpreterResult' -> do 
+    interpreterResult <- interpreterResult'
+    case interpreterResult of 
+      Left error -> errorHandler error
+      Right success -> successHandler success
 
 showInterpreterError :: InterpreterError -> String
 showInterpreterError (WontCompile es) = intercalate "\n" $ map unbox es
