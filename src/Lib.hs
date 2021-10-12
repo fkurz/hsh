@@ -1,7 +1,7 @@
 module Lib where 
 
 import Prelude (IO, Int, Either(..), String, putStrLn, return, show, ($), (.), (<$>))
-import System.Directory (getCurrentDirectory, setCurrentDirectory)
+import System.Directory (getCurrentDirectory, setCurrentDirectory, listDirectory)
 import System.IO (FilePath)
 import Control.Monad.IO.Class (liftIO)
 
@@ -22,4 +22,8 @@ echo :: String -> IO CommandLineExecutionResult
 echo message = do 
     putStrLn message
     return $ Right ""
+
+ls :: FilePath -> IO CommandLineExecutionResult
+ls filePath = Right . show <$> listDirectory filePath 
+
 
