@@ -11,34 +11,6 @@ import System.FilePath.Posix (joinPath)
 
 import Lib (CommandLineExecutionResult)
 
-{-
-TODOs
-- parse and interpret code (/)
-- implement echo + cd + cwd + calc
-  - echo (/)
-  - cd (/)
-  - cwd (/)
-  - calc (/)
-  - print/printf ()
-  - ls ()
-- bug: allow cd without breaking module imports (/)
-- implement pipe operator 
-  - cwd & ls
-  - calc $ 1 + 1 & echo
-- input mode/direct execution mode (ESC -> input mode -> reads input and aggregates until ESC pressed again; otherwise direct execution)
-- transactional behavior/execution plans
-- multiline input 
-
-  $ hsh 1 + \
-  ...  2 + \
-  ...  3
-  6
-- syntax highlighting
-- autocompletion
-- draw prompt
-  - using starship toml format?
--}
-
 data Configuration = Configuration {
   moduleListOf :: [String],
   importListOf :: [String]
