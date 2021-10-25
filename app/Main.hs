@@ -1,3 +1,5 @@
+{-# LANGUAGE TypeSynonymInstances, FlexibleInstances #-}
+
 module Main where
 
 import Control.Monad (unless, when, return, join, (>=>))
@@ -36,7 +38,7 @@ processCommands configuration = do
   commandLine' <- prompt drawPrompt
   case commandLine' of 
     Just commandLine -> do 
-      processCommandLine configuration commandLine errorHandler successHandler
+      processCommandLine configuration commandLine
       processCommands configuration
     Nothing -> do 
       putStrLn "Exiting hsh"
@@ -51,14 +53,14 @@ prompt drawPrompt = do
       then Just <$> getLine
       else return Nothing
 
-drawPrompt = "\n> "
+drawPrompt = "\nλ> "
 
 type CommandLineInterpreterResult = Either InterpreterError (IO CommandLineExecutionResult)
 
-processCommandLine :: Configuration -> String -> (String -> IO ()) -> (String -> IO ()) -> IO ()
-processCommandLine configuration commandLine errorHandler successHandler = do
+processCommandLine :: Configuration -> String -> IO ()
+processCommandLine configuration commandLine = do
   commandLineInterpreterResult <- runCommandLineInterpreter configuration commandLine
-  processCommandLineInterpreterResult commandLineInterpreterResult errorHandler successHandler
+  print commandLineInterpreterResult
 
 runCommandLineInterpreter configuration commandLine = runInterpreter $ do 
     loadModules $ moduleListOf configuration
@@ -66,24 +68,27 @@ runCommandLineInterpreter configuration commandLine = runInterpreter $ do
     set [languageExtensions := languageExtensionsOf configuration]
     interpret commandLine (as :: IO CommandLineExecutionResult)
 
-processCommandLineInterpreterResult :: CommandLineInterpreterResult  -> (String -> IO ()) -> (String -> IO ()) -> IO ()
-processCommandLineInterpreterResult commandLineInterpreterResult errorHandler successHandler = case commandLineInterpreterResult of 
-  Left interpreterError -> errorHandler $ showInterpreterError interpreterError
-  Right interpreterResult' -> do 
-    interpreterResult <- interpreterResult'
-    case interpreterResult of 
-      Left error -> errorHandler error
-      Right success -> successHandler success
+class Show a => Printable a where
+  print :: a -> IO ()
+  print x = putStr $ show x
+
+instance Printable String where 
+  print = putStr 
+
+instance Printable CommandLineExecutionResult where
+  print (Right result) = print $ "success: " ++ result
+  print (Left error) = print $ "error: " ++ error
+
+-- | TODO FK an ugly hack to allow the Printable instance for CommandLineInterpreterResult since
+-- its result type IO CommandLineExecutionResult does not have—rightly so!—a Show instance.
+instance Show (IO CommandLineExecutionResult) where
+  show _ = ""
+
+instance Printable CommandLineInterpreterResult where
+  print (Right result) = result >>= print
+  print (Left error) = putStr $ showInterpreterError error
 
 showInterpreterError :: InterpreterError -> String
 showInterpreterError (WontCompile es) = intercalate "\n" $ map unbox es
   where unbox (GhcError e) = e
 showInterpreterError e = show e
-
-errorHandler :: String -> IO ()
-errorHandler = putStr . (++) "e: " 
-
-successHandler :: String -> IO ()
-successHandler [] = putStr ""
-successHandler output = putStr $ (++) "λ: " output
-
