@@ -6,14 +6,15 @@ import Data.List (intercalate)
 import System.IO (BufferMode(..), isEOF, hSetBuffering, stdout, hFlush)
 import System.Directory (getCurrentDirectory)
 import Prelude (IO, Int, String, Either(..), Maybe(..), Show, not, show, getLine, map, putStr, putStrLn, show, unwords, ($), (.), (++), (>>), (>>=), (<$>))
-import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), loadModules, setImports, interpret, as, runInterpreter)
+import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), Extension(OverloadedStrings), OptionVal((:=)), loadModules, setImports, interpret, as, runInterpreter, set, languageExtensions)
 import System.FilePath.Posix (joinPath)
 
 import Lib (CommandLineExecutionResult)
 
 data Configuration = Configuration {
   moduleListOf :: [String],
-  importListOf :: [String]
+  importListOf :: [String],
+  languageExtensionsOf :: [Extension]
 }
 
 main = do 
@@ -23,8 +24,12 @@ main = do
 buildConfiguration :: IO Configuration
 buildConfiguration = do 
   currentWorkingDirectory <- getCurrentDirectory
-  let libDirectory = joinPath [currentWorkingDirectory, "src/Lib.hs"]
-  return $ Configuration { moduleListOf = [libDirectory], importListOf = ["Prelude", "Lib"] }
+  let libModulePath = joinPath [currentWorkingDirectory, "src/Lib.hs"]
+  return $ Configuration { 
+    moduleListOf = [libModulePath] 
+    , importListOf = ["Prelude", "Lib", "Text.Format"] 
+    , languageExtensionsOf = [OverloadedStrings]
+  }
 
 processCommands :: Configuration -> IO ()
 processCommands configuration = do
@@ -58,6 +63,7 @@ processCommandLine configuration commandLine errorHandler successHandler = do
 runCommandLineInterpreter configuration commandLine = runInterpreter $ do 
     loadModules $ moduleListOf configuration
     setImports $ importListOf configuration
+    set [languageExtensions := languageExtensionsOf configuration]
     interpret commandLine (as :: IO CommandLineExecutionResult)
 
 processCommandLineInterpreterResult :: CommandLineInterpreterResult  -> (String -> IO ()) -> (String -> IO ()) -> IO ()
