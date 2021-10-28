@@ -3,15 +3,16 @@
 module Main where
 
 import Control.Monad (unless, when, return, join, (>=>))
-import Control.Monad.IO.Class (liftIO)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Control.Monad.Catch (MonadMask)
 import Data.List (intercalate)
 import System.IO (BufferMode(..), isEOF, hSetBuffering, stdout, hFlush)
 import System.Directory (getCurrentDirectory)
-import Prelude (IO, Int, String, Either(..), Maybe(..), Show, not, show, getLine, map, putStr, putStrLn, show, unwords, ($), (.), (++), (>>), (>>=), (<$>))
+import Prelude (IO, Int, String, Either(..), Maybe(..), Show, id, not, show, getLine, map, putStr, putStrLn, show, unwords, ($), (.), (++), (>>), (>>=), (<$>)) 
 import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), Extension(OverloadedStrings), OptionVal((:=)), loadModules, setImports, interpret, as, runInterpreter, set, languageExtensions)
 import System.FilePath.Posix (joinPath)
 
-import Lib (CommandLineExecutionResult)
+import Lib (Printable(..))
 
 data Configuration = Configuration {
   moduleListOf :: [String],
@@ -53,40 +54,24 @@ prompt drawPrompt = do
       then Just <$> getLine
       else return Nothing
 
-drawPrompt = "\nλ> "
-
-type CommandLineInterpreterResult = Either InterpreterError (IO CommandLineExecutionResult)
+drawPrompt = "λ> "
 
 processCommandLine :: Configuration -> String -> IO ()
-processCommandLine configuration commandLine = do
-  commandLineInterpreterResult <- runCommandLineInterpreter configuration commandLine
-  print commandLineInterpreterResult
+processCommandLine configuration commandLineExpression = do
+  commandLineInterpreterResult <- runCommandLineInterpreter configuration commandLineExpression
+  case commandLineInterpreterResult of 
+    Left interpreterError -> putStrLn $ showInterpreterError interpreterError
+    Right interpreterSuccess -> interpreterSuccess 
 
-runCommandLineInterpreter configuration commandLine = runInterpreter $ do 
+-- | To make our lives easier, we require that all expressions passed via the command line are of type @IO a@ where @a@ has a @Printable@ instance.
+-- This allows us to make the interpretation result monomorphic and moreover enforce that shell commands provide some kind of human readable output.
+runCommandLineInterpreter :: (MonadIO m, MonadMask m) => Configuration -> String -> m (Either InterpreterError (IO ())) 
+runCommandLineInterpreter configuration commandLineExpression = runInterpreter $ do 
     loadModules $ moduleListOf configuration
     setImports $ importListOf configuration
     set [languageExtensions := languageExtensionsOf configuration]
-    interpret commandLine (as :: IO CommandLineExecutionResult)
-
-class Show a => Printable a where
-  print :: a -> IO ()
-  print x = putStr $ show x
-
-instance Printable String where 
-  print = putStr 
-
-instance Printable CommandLineExecutionResult where
-  print (Right result) = print $ "success: " ++ result
-  print (Left error) = print $ "error: " ++ error
-
--- | TODO FK an ugly hack to allow the Printable instance for CommandLineInterpreterResult since
--- its result type IO CommandLineExecutionResult does not have—rightly so!—a Show instance.
-instance Show (IO CommandLineExecutionResult) where
-  show _ = ""
-
-instance Printable CommandLineInterpreterResult where
-  print (Right result) = result >>= print
-  print (Left error) = putStr $ showInterpreterError error
+    let printedCommandLineExpression = "(" ++ commandLineExpression ++ ") >>= Lib.print"
+    interpret printedCommandLineExpression (as :: IO ())
 
 showInterpreterError :: InterpreterError -> String
 showInterpreterError (WontCompile es) = intercalate "\n" $ map unbox es
