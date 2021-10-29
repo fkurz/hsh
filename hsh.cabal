@@ -37,6 +37,7 @@ library
     , exceptions >=0.10.4 && <0.11
     , filepath >=1.4.2.1 && <1.5
     , hint >=0.9
+    , pretty-simple >=4.0.0.0 && <5.0.0.0
     , vformat >=0.14.1.0 && <0.15
   default-language: Haskell2010
 
@@ -55,6 +56,7 @@ executable hsh-exe
     , filepath >=1.4.2.1 && <1.5
     , hint >=0.9
     , hsh
+    , pretty-simple >=4.0.0.0 && <5.0.0.0
     , vformat >=0.14.1.0 && <0.15
   default-language: Haskell2010
 
@@ -74,5 +76,6 @@ test-suite hsh-test
     , filepath >=1.4.2.1 && <1.5
     , hint >=0.9
     , hsh
+    , pretty-simple >=4.0.0.0 && <5.0.0.0
     , vformat >=0.14.1.0 && <0.15
   default-language: Haskell2010

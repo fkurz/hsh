@@ -12,8 +12,6 @@ import Prelude (IO, Int, String, Either(..), Maybe(..), Show, id, not, show, get
 import Language.Haskell.Interpreter (Interpreter, InterpreterError(..), GhcError(..), Extension(OverloadedStrings), OptionVal((:=)), loadModules, setImports, interpret, as, runInterpreter, set, languageExtensions)
 import System.FilePath.Posix (joinPath)
 
-import Lib (Printable(..))
-
 data Configuration = Configuration {
   moduleListOf :: [String],
   importListOf :: [String],
@@ -30,7 +28,7 @@ buildConfiguration = do
   let libModulePath = joinPath [currentWorkingDirectory, "src/Lib.hs"]
   return $ Configuration { 
     moduleListOf = [libModulePath] 
-    , importListOf = ["Prelude", "Lib", "Text.Format"] 
+    , importListOf = ["Prelude", "Lib", "Text.Format", "Text.Pretty.Simple"] 
     , languageExtensionsOf = [OverloadedStrings]
   }
 
@@ -63,14 +61,15 @@ processCommandLine configuration commandLineExpression = do
     Left interpreterError -> putStrLn $ showInterpreterError interpreterError
     Right interpreterSuccess -> interpreterSuccess 
 
--- | To make our lives easier, we require that all expressions passed via the command line are of type @IO a@ where @a@ has a @Printable@ instance.
--- This allows us to make the interpretation result monomorphic and moreover enforce that shell commands provide some kind of human readable output.
+-- | To make our lives easier, we require that all expressions passed via the command line are of type @IO a@ where @a@ can be printed by the 
+-- pretty-simple library. Not only does this allow us to make the interpretation result monomorphic as @IO ()@, but it morever enforces that shell 
+-- commands provide some kind of human readable output.
 runCommandLineInterpreter :: (MonadIO m, MonadMask m) => Configuration -> String -> m (Either InterpreterError (IO ())) 
 runCommandLineInterpreter configuration commandLineExpression = runInterpreter $ do 
     loadModules $ moduleListOf configuration
     setImports $ importListOf configuration
     set [languageExtensions := languageExtensionsOf configuration]
-    let printedCommandLineExpression = "(" ++ commandLineExpression ++ ") >>= Lib.print"
+    let printedCommandLineExpression = "(" ++ commandLineExpression ++ ") >>= pPrintNoColor"
     interpret printedCommandLineExpression (as :: IO ())
 
 showInterpreterError :: InterpreterError -> String
